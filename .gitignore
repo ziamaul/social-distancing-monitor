@@ -1,0 +1,7 @@
+reports
+data
+tests
+.gitattributes
+.idea
+*__pycache__
+YOLO
