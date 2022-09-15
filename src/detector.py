@@ -8,7 +8,7 @@ import queue
 import os
 
 from src.utilities import transform, utils
-
+from src import gui
 net: cv.dnn
 input_dim = None
 
@@ -32,22 +32,46 @@ def init(weights_path, config_path):
     input_dim = (parser.getint("net", "width"), parser.getint("net", "height"))
 
 
-def start(gui_queue: queue.Queue, status_queue: queue.Queue, data_queue: queue.Queue, image_queue: queue.Queue, settings: dict):
-    init(settings["model_weights_path"], settings["model_config_path"])
-
-    print("[DETECTION] Started")
+def start(gui_queue: queue.Queue, status_queue: queue.Queue, data_queue: queue.Queue, image_queue: queue.Queue, message_queue: queue.Queue, settings: dict):
     status_queue.put(["STARTING", "STARTING"])
+
+    errored = False
+
+    try:
+        init(settings["model_weights_path"], settings["model_config_path"])
+    except:
+        message_queue.put({"type": "error", "title": "ERROR LOADING NETWORK", "message": ".cfg and .weights files not found. Change this in the settings and make sure the files exist, then restart the detector."})
+        errored = True
+
     global cap
     cap = cv.VideoCapture(settings["camera_index"], cv.CAP_DSHOW)
     cap.set(propId=cv.CAP_PROP_FRAME_WIDTH, value=settings["camera_width"])
     cap.set(propId=cv.CAP_PROP_FRAME_HEIGHT, value=settings["camera_height"])
 
-    print(settings)
+    if not cap.isOpened():
+        message_queue.put({"type": "error", "title": "ERROR OPENING CAMERA", "message": "The input device at USB port {0} cannot be opened. Make sure it is connected or change the port in the settings, then restart the detector.".format(settings["camera_index"])})
+        errored = True
 
-    global matrix
-    global pixels_to_meters
     status_queue.put(["STARTING", "WORKING"])
-    matrix, pixels_to_meters = calibrate(cap.read()[1])
+
+    try:
+        global matrix
+        global pixels_to_meters
+        matrix, pixels_to_meters = calibrate(cap.read()[1], settings["calib_data_path"], message_queue)
+    except:
+        errored = True
+
+    if errored:
+        status_queue.put(["ERROR", "ERROR"])
+
+        # Fallback to restart network
+        while True:
+            if not gui_queue.empty():
+                _ = gui_queue.get()
+                if not gui_queue.empty() and gui_queue.get():
+                    start(gui_queue, status_queue, data_queue, image_queue, message_queue, settings)
+
+                return
 
     running = True
     status_queue.put(["OK", "OK"])
@@ -77,7 +101,7 @@ def start(gui_queue: queue.Queue, status_queue: queue.Queue, data_queue: queue.Q
         status_queue.put(["PAUSED", "PAUSED"])
         data_queue.put([-1, -1, -1, -1, -1, -1])
         image_queue.put([np.zeros((1080, 720, 4), dtype=np.float32)] * 2)
-        start(gui_queue, status_queue, data_queue, image_queue, settings)
+        return start(gui_queue, status_queue, data_queue, image_queue, message_queue, settings)
 
 def detect(img):
     #print("[DETECTION] Detecting")
@@ -204,17 +228,20 @@ def parse(outputs, img_width, img_height, proj_matrix):
     return boxes, confidences, indexes, bottom, classes, projected
 
 
-def calibrate(img):
+def calibrate(img, calib_file: str, message_queue: queue.Queue):
     mat: np.matrix
     p2m: int
-    print("[DETECTION] Calibrating...")
-    if os.path.exists("./data/calib_data"):
-        print("[DETECTION] Found calibration data file")
-        with open("./data/calib_data", "r") as data:
-            d1, d2 = data.readlines()
-            p2m = int(d2)
-            mat = np.matrix(d1, dtype=np.float32)
-            data.close()
+
+    if os.path.exists(calib_file):
+        with open(calib_file, "r") as data:
+            try:
+                d1, d2 = data.readlines()
+                p2m = int(d2)
+                mat = np.matrix(d1, dtype=np.float32)
+                data.close()
+            except:
+                message_queue.put({"type": "error", "title": "ERROR CALIBRATING", "message": "Calibration data file malformed. Delete the file then restart the detector to recalibrate."})
+
     else:
         print("[DETECTION] Detecting markers")
         aruco_dict = cv.aruco.Dictionary_get(cv.aruco.DICT_6X6_250)
@@ -223,8 +250,7 @@ def calibrate(img):
         corners, ids, rejected = cv.aruco.detectMarkers(img, aruco_dict, parameters=aruco_params)
 
         if len(ids) != 4:
-            print("[DETECTION] Calibration failed: Insufficient Markers")
-            print("[DETECTION] Failed to detect {0} markers".format(4 - len(ids)))
+            message_queue.put({"type": "error", "title": "ERROR CALIBRATING", "message": "{0} out of 4 calibration markers cannot be detected. Readjust the markers or the camera then restart the detector to recalibrate.".format(4 - len(ids))})
             return None
 
         print("[DETECTION] Calculating transformation matrix")
@@ -254,7 +280,7 @@ def calibrate(img):
         p2m = utils.dst2(m1x, m1y, m2x, m2y) / 4
 
         print("[DETECTION] Writing calibration data")
-        with open("./data/calib_data", "w") as file:
+        with open(calib_file, "w") as file:
             data = ""
             for i in range(1, 10):
                 data += str(mat.item(i - 1)) + " "

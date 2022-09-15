@@ -43,7 +43,7 @@ def start(reporter_queue: queue.Queue, reporter_data: queue.Queue, settings: dic
     if not reporter_queue.empty() and reporter_queue.get():
         start(reporter_queue, reporter_data)
 
-    print("[REPORTER] Closed")
+    print("[REPORTER ] Closed")
 
 
 

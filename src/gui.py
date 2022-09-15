@@ -55,8 +55,21 @@ def scan_cameras():
         global cameras
         cameras = filter_graph.get_input_devices()
 
+def show_message(message: dict):
+    message_type = message["type"]
+    if message_type == "error":
+        dpg.configure_item("message_window", label="Error")
+    elif message_type == "warning":
+        dpg.configure_item("message_window", label="Warning")
+    elif message_type == "message":
+        dpg.configure_item("message_window", label="Notice")
 
-def init(gui_queue: queue.Queue, status_queue: queue.Queue, data_queue: queue.Queue, image_queue: queue.Queue, reporter_queue: queue.Queue, reporter_data: queue.Queue, settings: dict):
+    dpg.set_value("message_text", message["message"])
+    dpg.set_value("message_title", message["title"])
+
+    dpg.show_item("message_window")
+
+def init(gui_queue: queue.Queue, status_queue: queue.Queue, data_queue: queue.Queue, image_queue: queue.Queue, reporter_queue: queue.Queue, reporter_data: queue.Queue, message_queue, settings: dict):
     print("[GUI      ] Initialized")
 
     scan_cameras()
@@ -69,7 +82,6 @@ def init(gui_queue: queue.Queue, status_queue: queue.Queue, data_queue: queue.Qu
         if os.name == "nt":
             dpg.set_value("camera_stream", "Streaming From: " + cameras[settings["camera_index"]])
 
-        dpg.hide_item("reset_button")
         user_data[1].put(last_path)
         user_data[1].put(True)
         user_data[1].put(True)
@@ -82,7 +94,7 @@ def init(gui_queue: queue.Queue, status_queue: queue.Queue, data_queue: queue.Qu
         dpg.add_dynamic_texture(width=1080, height=720, default_value=data, tag="bev_image")
         dpg.add_dynamic_texture(width=1080, height=720, default_value=data, tag="output_image")
 
-    with dpg.window(tag="settings_window", label="Settings", no_resize=True, width=480, height=250, pos=(275, 235), show=False, no_move=True, no_collapse=True, modal=True):
+    with dpg.window(tag="settings_window", label="Settings", no_resize=True, width=480, height=250, pos=(275, 205), show=False, no_move=True, no_collapse=True, modal=True):
         with dpg.table(header_row=False):
 
             dpg.add_table_column(width_fixed=True, width=100)
@@ -276,11 +288,15 @@ def init(gui_queue: queue.Queue, status_queue: queue.Queue, data_queue: queue.Qu
                             add_graph("Average Distance", "average_distance_graph", graph_times, avg_distances, "meters (m)", 0, 10)
                             add_graph("Violations", "violations_graph", graph_times, violation_counts, "", 0, 10)
 
+    with dpg.window(tag="message_window", label="Alert!", no_resize=True, width=480, height=150, pos=(275, 230), show=False, no_move=True, no_collapse=True, modal=True):
+        dpg.add_text(default_value="", tag="message_title")
+        dpg.add_spacer()
+        dpg.add_text(default_value="", wrap=480, tag="message_text")
 
-    start(gui_queue, status_queue, data_queue, image_queue, reporter_queue, reporter_data, settings)
+    start(gui_queue, status_queue, data_queue, image_queue, reporter_queue, reporter_data, message_queue, settings)
 
 
-def start(gui_queue: queue.Queue, status_queue: queue.Queue, data_queue: queue.Queue, image_queue: queue.Queue, reporter_queue: queue.Queue, reporter_data: queue.Queue, settings: dict):
+def start(gui_queue: queue.Queue, status_queue: queue.Queue, data_queue: queue.Queue, image_queue: queue.Queue, reporter_queue: queue.Queue, reporter_data: queue.Queue, message_queue, settings: dict):
     global max_total_counts
     print("[GUI      ] Started")
     dpg.setup_dearpygui()
@@ -293,10 +309,11 @@ def start(gui_queue: queue.Queue, status_queue: queue.Queue, data_queue: queue.Q
         dpg.set_value("time_label", "Time: {0}:{1}:{2}".format(localtime.tm_hour, localtime.tm_min, localtime.tm_sec))
         update_graphs()
 
+        if not message_queue.empty() and not dpg.is_item_shown("message_window"):
+            show_message(message_queue.get())
+
         if not status_queue.empty():
             status = status_queue.get()
-            if status[0]=="OK":
-                dpg.show_item("reset_button")
 
             dpg.set_value("calibration_status", status[0])
             dpg.set_value("detection_status", status[1])

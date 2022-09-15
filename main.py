@@ -11,24 +11,26 @@ def main(settings: dict):
     gui_queue = queue.Queue()
     reporter_queue = queue.Queue()
 
+    message_queue = queue.Queue()
+
     status_queue = queue.Queue()
     data_queue = queue.Queue()
     image_queue = queue.Queue()
 
     reporter_data = queue.Queue()
 
-    detector_thread = threading.Thread(target=detector.start, name="DETECTOR", args=(gui_queue, status_queue, data_queue, image_queue, settings))
+    detector_thread = threading.Thread(target=detector.start, name="DETECTION", args=(gui_queue, status_queue, data_queue, image_queue, message_queue, settings))
     reporter_thread = threading.Thread(target=reporter.start, name="REPORTER", args=(reporter_queue, reporter_data, settings))
 
-    print("[DETECTOR] Started")
-    print("[REPORTER] Started")
+    print("[DETECTION] Started")
+    print("[REPORTER ] Started")
     detector_thread.start()
     reporter_thread.start()
 
-    print("[GUI     ] Started")
+    print("[GUI      ] Started")
 
     try:
-        gui.init(gui_queue, status_queue, data_queue, image_queue, reporter_queue, reporter_data, settings)
+        gui.init(gui_queue, status_queue, data_queue, image_queue, reporter_queue, reporter_data, message_queue, settings)
     finally:
         gui_queue.put(False)
         reporter_queue.put(None)
@@ -44,6 +46,7 @@ if __name__ == "__main__":
     settings_dict = {
         "model_weights_path": "./YOLO/yolov3.weights",
         "model_config_path": "./YOLO/yolov3.cfg",
+        "calib_data_path": "./data/calib_data",
 
         "camera_index": 0,
         "camera_width": 1920,
