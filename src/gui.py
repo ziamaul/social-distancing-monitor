@@ -50,11 +50,16 @@ def show_file_selector(item_name, callback):
     dpg.show_item(item_name)
 
 
-def init(gui_queue: queue.Queue, status_queue: queue.Queue, data_queue: queue.Queue, image_queue: queue.Queue, reporter_queue: queue.Queue, reporter_data: queue.Queue, settings: dict):
-    print("[GUI      ] Initialized")
+def scan_cameras():
     if os.name == "nt":
         global cameras
         cameras = filter_graph.get_input_devices()
+
+
+def init(gui_queue: queue.Queue, status_queue: queue.Queue, data_queue: queue.Queue, image_queue: queue.Queue, reporter_queue: queue.Queue, reporter_data: queue.Queue, settings: dict):
+    print("[GUI      ] Initialized")
+
+    scan_cameras()
 
     dpg.create_context()
     dpg.create_viewport(title='Social Distancing Monitor', width=1030, height=720, resizable=False, max_width=1030, max_height=720)
@@ -77,7 +82,7 @@ def init(gui_queue: queue.Queue, status_queue: queue.Queue, data_queue: queue.Qu
         dpg.add_dynamic_texture(width=1080, height=720, default_value=data, tag="bev_image")
         dpg.add_dynamic_texture(width=1080, height=720, default_value=data, tag="output_image")
 
-    with dpg.window(tag="settings_window", label="Settings", no_resize=True, width=480, height=520, pos=(275, 80), show=False, no_move=True, no_collapse=True, modal=True):
+    with dpg.window(tag="settings_window", label="Settings", no_resize=True, width=480, height=250, pos=(275, 235), show=False, no_move=True, no_collapse=True, modal=True):
         with dpg.table(header_row=False):
 
             dpg.add_table_column(width_fixed=True, width=100)
@@ -136,7 +141,6 @@ def init(gui_queue: queue.Queue, status_queue: queue.Queue, data_queue: queue.Qu
                             dpg.set_value("camera_index", index)
 
                         dpg.add_combo(default_value=cameras[settings["camera_index"]], items=cameras, callback=set_index_combo, tag="camera_index_combo", width=-1)
-
             with dpg.table_row():
                 dpg.add_text("Frame Width")
                 def set_width(sender, app_data, user_data):
@@ -154,10 +158,21 @@ def init(gui_queue: queue.Queue, status_queue: queue.Queue, data_queue: queue.Qu
                 dpg.add_input_int(default_value=settings["camera_height"], width=-1, tag="camera_height", on_enter=True, callback=set_height)
 
         dpg.add_spacer(height=10)
-        dpg.add_button(label="Apply", width=100, callback=reset, tag="menu_apply")
-        dpg.set_item_user_data("menu_apply", [gui_queue, reporter_queue])
-        with dpg.tooltip(parent="menu_apply"):
-            dpg.add_text("Apply changes. Will reset the detector.")
+        with dpg.group(horizontal=True):
+            dpg.add_button(label="Apply", width=100, callback=reset, tag="menu_apply")
+            dpg.set_item_user_data("menu_apply", [gui_queue, reporter_queue])
+            with dpg.tooltip(parent="menu_apply"):
+                dpg.add_text("Apply changes. Will reset the detector.")
+
+
+            if os.name == "nt":
+                def scan_cameras_update():
+                    scan_cameras()
+                    dpg.configure_item("camera_index_combo", items=cameras)
+
+                dpg.add_button(label="Scan Inputs", width=100, callback=scan_cameras_update, tag="input_scan")
+                with dpg.tooltip(parent="input_scan"):
+                    dpg.add_text("Scans USB ports for external cameras.")
 
     with dpg.window(tag="main_window", no_resize=True):
 
