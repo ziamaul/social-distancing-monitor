@@ -43,6 +43,8 @@ def main(settings: dict):
 
 
 if __name__ == "__main__":
+
+    # Default Settings
     settings_dict = {
         "model_weights_path": "./YOLO/yolov3.weights",
         "model_config_path": "./YOLO/yolov3.cfg",
