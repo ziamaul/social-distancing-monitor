@@ -173,8 +173,6 @@ def init(gui_queue: queue.Queue, status_queue: queue.Queue, data_queue: queue.Qu
             with dpg.tooltip(parent="menu_apply"):
                 dpg.add_text("Apply changes. Will reset the detector.")
 
-            dpg.add_button(label="Delete Calibration Data", width=100, callback=reset, tag="delete_calib")
-
             if os.name == "nt":
                 def scan_cameras_update():
                     scan_cameras()
@@ -183,6 +181,12 @@ def init(gui_queue: queue.Queue, status_queue: queue.Queue, data_queue: queue.Qu
                 dpg.add_button(label="Scan Inputs", width=100, callback=scan_cameras_update, tag="input_scan")
                 with dpg.tooltip(parent="input_scan"):
                     dpg.add_text("Scans USB ports for external cameras.")
+
+            def delete_calib():
+                if os.path.exists("./data/calib_data"):
+                    os.remove("./data/calib_data")
+
+            dpg.add_button(label="Delete Calibration Data", width=100, callback=delete_calib, tag="delete_calib")
 
     with dpg.window(tag="main_window", no_resize=True):
 
