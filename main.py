@@ -5,8 +5,6 @@ import sys
 
 from src import detector, gui, reporter
 
-print(sys.path)
-
 def main(settings: dict):
     gui_queue = queue.Queue()
     reporter_queue = queue.Queue()
@@ -48,7 +46,6 @@ if __name__ == "__main__":
     settings_dict = {
         "model_weights_path": "./YOLO/yolov3.weights",
         "model_config_path": "./YOLO/yolov3.cfg",
-        "calib_data_path": "./data/calib_data",
 
         "camera_index": 0,
         "camera_width": 1920,
@@ -82,4 +79,3 @@ if __name__ == "__main__":
             settings += str(key) + ";" + str(value) + ";"
         file.write(settings)
         file.close()
-

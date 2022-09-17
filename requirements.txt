@@ -2,3 +2,4 @@ pygrabber==0.1
 dearpygui>=1.6.2
 numpy>=1.21.4
 opencv-contrib-python==4.6.0.66
+wget>=3.2

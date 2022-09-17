@@ -21,8 +21,6 @@ unsure_counts = [0] * 60
 total_counts = [0] * 60
 violation_counts = [0] * 60
 
-last_path = "./reports"
-
 max_total_counts = 5
 total_axis, confirmed_axis, unsure_axis = None, None, None
 
@@ -82,8 +80,7 @@ def init(gui_queue: queue.Queue, status_queue: queue.Queue, data_queue: queue.Qu
         if os.name == "nt":
             dpg.set_value("camera_stream", "Streaming From: " + cameras[settings["camera_index"]])
 
-        user_data[1].put(last_path)
-        user_data[1].put(True)
+        user_data[1].put(settings["reports_path"])
         user_data[1].put(True)
 
         user_data[0].put(False)
@@ -176,6 +173,7 @@ def init(gui_queue: queue.Queue, status_queue: queue.Queue, data_queue: queue.Qu
             with dpg.tooltip(parent="menu_apply"):
                 dpg.add_text("Apply changes. Will reset the detector.")
 
+            dpg.add_button(label="Delete Calibration Data", width=100, callback=reset, tag="delete_calib")
 
             if os.name == "nt":
                 def scan_cameras_update():

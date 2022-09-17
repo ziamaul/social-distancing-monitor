@@ -44,7 +44,10 @@ def start(gui_queue: queue.Queue, status_queue: queue.Queue, data_queue: queue.Q
         errored = True
 
     global cap
+
+    # TODO: Handle errors with virtual cameras
     cap = cv.VideoCapture(settings["camera_index"], cv.CAP_DSHOW)
+
     cap.set(propId=cv.CAP_PROP_FRAME_WIDTH, value=settings["camera_width"])
     cap.set(propId=cv.CAP_PROP_FRAME_HEIGHT, value=settings["camera_height"])
 
@@ -54,12 +57,43 @@ def start(gui_queue: queue.Queue, status_queue: queue.Queue, data_queue: queue.Q
 
     status_queue.put(["STARTING", "WORKING"])
 
-    try:
-        global matrix
-        global pixels_to_meters
-        matrix, pixels_to_meters = calibrate(cap.read()[1], settings["calib_data_path"], message_queue)
-    except:
-        errored = True
+    if not errored:
+        try:
+            global matrix
+            global pixels_to_meters
+
+            matrix, pixels_to_meters = calibrate(cap.read()[1], "./data/calib_data", message_queue)
+        except:
+            errored = True
+
+    if not errored:
+        status_queue.put(["OK", "OK"])
+
+    running = True
+    while running and not errored:
+        try:
+            _, img = cap.read()
+
+            frametime = time.time()
+            detection_data, images = detect(img)
+            frametime = int((time.time() - frametime) * 1000)
+            detection_data.append(frametime)
+
+            #print("[DETECTION] took " + str(frametime) + "ms")
+
+            data_queue.put(detection_data)
+            image_queue.put([
+                utils.convert_image(cv.resize(images[0], (1080, 720))),
+                utils.convert_image(cv.resize(images[1], (1080, 720)))
+            ])
+
+            if not gui_queue.empty():
+                running = gui_queue.get()
+        except:
+            message_queue.put({"type": "error", "title": "ERROR DETECTING", "message": "Something went wrong. Make sure input device is functional."})
+
+            running = False
+            errored = True
 
     if errored:
         status_queue.put(["ERROR", "ERROR"])
@@ -73,28 +107,10 @@ def start(gui_queue: queue.Queue, status_queue: queue.Queue, data_queue: queue.Q
 
                 return
 
-    running = True
-    status_queue.put(["OK", "OK"])
-    while running:
-        _, img = cap.read()
-
-        frametime = time.time()
-        detection_data, images = detect(img)
-        frametime = int((time.time() - frametime) * 1000)
-        detection_data.append(frametime)
-
-        #print("[DETECTION] took " + str(frametime) + "ms")
-
-        data_queue.put(detection_data)
-        image_queue.put([
-            utils.convert_image(cv.resize(images[0], (1080, 720))),
-            utils.convert_image(cv.resize(images[1], (1080, 720)))
-        ])
-
-        if not gui_queue.empty():
-            running = gui_queue.get()
 
     print("[DETECTION] Stopped")
+
+    cap.release()
 
     # pass in TRUE again to restart
     if not gui_queue.empty() and gui_queue.get():
