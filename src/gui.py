@@ -186,7 +186,7 @@ def init(gui_queue: queue.Queue, status_queue: queue.Queue, data_queue: queue.Qu
                 if os.path.exists("./data/calib_data"):
                     os.remove("./data/calib_data")
 
-            dpg.add_button(label="Delete Calibration Data", width=100, callback=delete_calib, tag="delete_calib")
+            dpg.add_button(label="Delete Calibration Data", width=200, callback=delete_calib, tag="delete_calib")
 
     with dpg.window(tag="main_window", no_resize=True):
 
